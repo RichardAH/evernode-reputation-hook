@@ -25,6 +25,7 @@ uint8_t registry_accid[20] =
     0x1FU,0x50U,0x53U,0x96U,0x34U,0xE4U,0x02U,0x4FU,0xB4U,0x57U
 };
 
+#define MOMENT_SECONDS 3600
 
 int64_t hook(uint32_t r)
 {
@@ -51,9 +52,10 @@ int64_t hook(uint32_t r)
     if (!no_scores_submitted && result != 64)
         NOPE("Everrep: sfBlob must be 64 bytes.");
 
-    uint64_t current_moment = ledger_last_time() / 3600;
+    uint64_t current_moment = ledger_last_time() / MOMENT_SECONDS;
     uint64_t previous_moment = current_moment - 1;
     uint64_t before_previous_moment = current_moment - 2;
+    uint64_t next_moment = current_moment + 1;
 
     uint64_t cleanup_moment[2];
     uint64_t special = 0xFFFFFFFFFFFFFFFFULL;
@@ -145,11 +147,18 @@ int64_t hook(uint32_t r)
                     continue;
 
                 // sanity check: either they are still most recently registered for next moment or last
-                if (data[0] > current_moment || data[0] < previous_moment)
+                if (data[0] > next_moment || data[0] < previous_moment)
                     continue;
 
                 data[1] += blob[n];
                 data[2]++;
+
+                // when the denominator gets above a certain size we normalize the fraction by dividing top and bottom
+                if (data[2] > 12 * host_count)
+                {
+                    data[1] >>= 1;
+                    data[2] >>= 1;
+                }
                 state_set(data, 24, SBUF(accid));
             }
         }
@@ -159,10 +168,10 @@ int64_t hook(uint32_t r)
     // get host voting data
     uint64_t acc_data[3];
     state(SBUF(acc_data), accid+8, 20);
-    if (acc_data[0] == current_moment)
+    if (acc_data[0] == next_moment)
         NOPE("Everrep: Already registered for this round.");
 
-    acc_data[0] = current_moment;
+    acc_data[0] = next_moment;
     if (state_set(accid + 8, 20, acc_data, 24) != 24)
         NOPE("Everrep: Failed to set acc_data. Check hook reserves.");
     
@@ -176,10 +185,10 @@ int64_t hook(uint32_t r)
     // execution to here means we will register for next round
 
     uint64_t host_count;
-    state(SVAR(host_count), SVAR(current_moment));
+    state(SVAR(host_count), SVAR(next_moment));
 
-    *((uint64_t*)accid) = current_moment;
-    uint64_t forward[2] = {current_moment, 0};
+    *((uint64_t*)accid) = next_moment;
+    uint64_t forward[2] = {next_moment, 0};
 
     if (host_count == 0)
     {
@@ -198,7 +207,7 @@ int64_t hook(uint32_t r)
         // put the other at the end
         forward[1] = other;
         uint8_t reverse[28];
-        *((uint64_t*)reverse) = current_moment;
+        *((uint64_t*)reverse) = next_moment;
         state(reverse + 8, 20,  forward, 16);
 
         forward[1] = host_count;
