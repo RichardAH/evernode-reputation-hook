@@ -1,3 +1,29 @@
+/**
+ * Everrep - Reputation accumulator and universe shuffler hook for Evernode.
+ *
+ * State: (8l = 8 byte uint64 little endian)
+ *   [reputation account id : 20b]          => [last registered moment: 8l, score numerator: 8l, score denominator 8l]
+ *   [moment : 8l, repaccid : 20b]          => [ordered hostid : 8l]
+ *   [moment : 8l, ordered hostid : 8l ]    => [repaccid : 20b]
+ *   [moment : 8l]                          => [host count in that moment : 8l]
+ *
+ * Todo:
+ *  Use sfMessageKey to delegate "reputation scoring authority" from the host account to the reputation account.
+ *
+ * Behaviour:
+ *  There is a reputation round each moment (hour).
+ *  To register for a reputation round your reputation account invokes this hook.
+ *  If you were in the previous round then you submit your scores as a blob when you invoke, otherwise submit no blob.
+ *  You are placed into a shuffled deck. Your Ordered Host ID is your place in the deck. The first place is 0.
+ *  Your Ordered host ID is only final when the moment begins.
+ *  The deck is divided into subdecks of 64 hosts. These are called Universes.
+ *  The first Universe is Ordered Host ID's 0 through 63 inclusive.
+ *  Outside of this Hook, the reputation software should ascertain which Universe you are in.
+ *  It should compile the reputation contact with a UNL that matches the nodes in that universe.
+ *  It should run that contract for around 90% of the moment. Its participation is noticed by the other peers.
+ *  Each peer in the universe then compiles the ordered scores into a blob of 64 bytes and submits them back to this 
+ *  hook to both vote and register for thew next round at the same time.
+ */
 
 #include <stdint.h>
 #include "hookapi.h"
