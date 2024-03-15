@@ -172,7 +172,7 @@ int64_t hook(uint32_t r)
         NOPE("Everrep: Already registered for this round.");
 
     acc_data[0] = next_moment;
-    if (state_set(accid + 8, 20, acc_data, 24) != 24)
+    if (state_set(acc_data, 24, accid + 8, 20) != 24)
         NOPE("Everrep: Failed to set acc_data. Check hook reserves.");
     
     // first check if they're still in the registry
